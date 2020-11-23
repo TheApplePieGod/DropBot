@@ -6,6 +6,11 @@ __pycache__/
 # C extensions
 *.so
 
+*.pyproj
+*.pyproj.user
+*.sln
+.vs/*
+
 # Distribution / packaging
 .Python
 build/
