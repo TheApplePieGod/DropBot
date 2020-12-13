@@ -1,9 +1,12 @@
 from bs4 import BeautifulSoup
-from urllib import request, error, parse
-import re
+from urllib import request
 import json
 import requests
 from win10toast import ToastNotifier
+import time
+from colorama import init, Back, Fore, Style
+
+init(convert=True)
 
 headers = {
     "Accept": "*/*",
@@ -18,6 +21,12 @@ headers = {
 
 toaster = ToastNotifier()
 
+class Query:
+    def __init__(self, storeIds, query, isURL):
+        self.storeIds = storeIds
+        self.query = query
+        self.isURL = isURL
+
 class Store:
     def __init__(self, id, name, searchURL):
         self.id = id
@@ -27,29 +36,64 @@ class Store:
     def getItemName(self, soup):
         raise NotImplementedError("Store subclass must override this method")
 
+    def getItemNameDirect(self, soup):
+        raise NotImplementedError("Store subclass must override this method")
+
     def getStock(self, soup, session):
+        raise NotImplementedError("Store subclass must override this method")
+
+    def getStockDirect(self, soup, session):
         raise NotImplementedError("Store subclass must override this method")
 
 class Microcenter(Store):
     def getItemName(self, soup):
-        productElem = soup.select_one("a[data-name]")
+        productElem = soup.select_one("li[class=product_wrapper] > div > div > div > div > div > h2 > a[data-name]")
         if productElem == None:
-            return "Not found"
+            return "Error"
+        else:
+            return productElem["data-name"]
+
+    def getItemNameDirect(self, soup):
+        productElem = soup.select_one("div[id=details] > h1 > span > span[data-name]")
+        if productElem == None:
+            return "Error"
         else:
             return productElem["data-name"]
 
     def getStock(self, soup, session):
         stockElem = soup.select_one('div[class="stock"]')
         if stockElem != None:
-            return stockElem.text.strip()
+            stockText = stockElem.text.strip()
+            if stockText == "Sold Out":
+                return "Out of stock"
+            else:
+                return stockText
         else:
-            return "Not found"
+            return "Error"
+
+    def getStockDirect(self, soup, session):
+        stockElem = soup.select_one('span[class="inventoryCnt"]')
+        if stockElem != None:
+            stockText = stockElem.text.strip()
+            if stockText == "Sold Out":
+                return "Out of stock"
+            else:
+                return stockText
+        else:
+            return "Error"
 
 class Newegg(Store):
     def getItemName(self, soup):
         productElem = soup.select_one("div[class=item-container] > div > a")
         if productElem == None:
-            return "Not found"
+            return "Error"
+        else:
+            return productElem.text.strip()
+
+    def getItemNameDirect(self, soup):
+        productElem = soup.select_one("h1[class=product-title]")
+        if productElem == None:
+            return "Error"
         else:
             return productElem.text.strip()
 
@@ -71,68 +115,137 @@ class Newegg(Store):
                 webContent = resp.read()
                 productSoup = BeautifulSoup(webContent, 'html.parser')
 
-                stockElem = productSoup.select_one("div[class=product-inventory] > strong")
-                if stockElem != None:
-                    return stockElem.text.strip().replace(".", "")
-                else:
-                    return "Not found"
+                return self.getStockDirect(productSoup, session)
             else:
-                return "Not found"
+                return "Error"
+
+    def getStockDirect(self, soup, session):
+        stockElem = soup.select_one("div[class=product-inventory] > strong")
+        if stockElem != None:
+            stockText = stockElem.text.strip().replace(".", "")
+            if stockText.lower() == "out of stock":
+                return "Out of stock"
+            else:
+                return stockText
+        else:
+            return "Error"
 
 class Bestbuy(Store):
     def __init__(self, id, name, searchURL):
         super().__init__(id, name, searchURL)
         self.session = requests.Session()
 
+    def getStockFromSKU(self, skuVal, session):
+        url = "https://www.bestbuy.com/fulfillment/ispu/api/ispu/v2"
+        data = { "channel":"Ecommerce", "checkRetailAvailability":True, "lookupInStoreQuantity":True, "requestInfos": [{ "additionalLocationIds": [], "condition": None, "itemSeqNumber": "1", "locationId": "0", "sku": skuVal }], "searchNearby":False }
+            
+        resp = session.post(url, json=data, headers=headers)
+        obj = json.loads(resp.text)
+
+        return "In stock" if obj["responseInfos"][0]["pickupEligible"] else "Out of stock"
+
     def getItemName(self, soup):
         productElem = soup.select_one("h4[class=sku-header] > a")
         if productElem == None:
-            return "Not found"
+            return "Error"
         else:
             return productElem.text.strip()
+
+    def getItemNameDirect(self, soup):
+        titleElem = soup.select_one("div[class=sku-title] > h1")
+        if titleElem == None:
+            return "Error"
+        else:
+            return titleElem.text.strip()
 
     def getStock(self, soup, session):
         valueElements = soup.select("div[class=sku-attribute-title] > span[class=sku-value]")
         if valueElements == None or len(valueElements) < 2:
-            return "Not found"
+            return "Error"
         else: # post to their stock api to get info
             skuVal = valueElements[1].text.strip()
-            url = "https://www.bestbuy.com/fulfillment/ispu/api/ispu/v2"
-            data = { "channel":"Ecommerce", "checkRetailAvailability":True, "lookupInStoreQuantity":True, "requestInfos": [{ "additionalLocationIds": [], "condition": None, "itemSeqNumber": "1", "locationId": "0", "sku": skuVal }], "searchNearby":False }
-            
-            resp = session.post(url, json=data, headers=headers)
-            obj = json.loads(resp.text)
+            return self.getStockFromSKU(skuVal, session)
 
-            return "In stock" if obj["responseInfos"][0]["pickupEligible"] else "Out of stock"
+    def getStockDirect(self, soup, session):
+        valueElement = soup.select_one("div[class='sku product-data'] > span[class='product-data-value body-copy']")
+        if valueElement == None:
+            return "Error"
+        else: # post to their stock api to get info
+            skuVal = valueElement.text.strip()
+            return self.getStockFromSKU(skuVal, session)
 
 stores = []
-stores.append(Microcenter(0, "Microcenter", "https://www.microcenter.com/search/search_results.aspx?Ntt="))
-stores.append(Newegg(1, "Newegg", "https://www.newegg.com/p/pl?d="))
-stores.append(Bestbuy(2, "Bestbuy", "https://www.bestbuy.com/site/searchpage.jsp?sc=Global&usc=All+Categories&st="))
+stores.append(Microcenter(len(stores), "Microcenter", "https://www.microcenter.com/search/search_results.aspx?Ntt="))
+stores.append(Newegg(len(stores), "Newegg", "https://www.newegg.com/p/pl?d="))
+stores.append(Bestbuy(len(stores), "Bestbuy", "https://www.bestbuy.com/site/searchpage.jsp?sc=Global&usc=All+Categories&st="))
 
-#queryList = ["PlayStation 5 Console", "GeForce RTX 3070", "Bose QuietComfort 35 II"]
-queryList = ["GeForce RTX 3070 Card"]
+queryList = []
+queryList.append(Query([], "NVIDIA GeForce RTX 3070 8GB GDDR6 PCI Express 4.0 Graphics Card", False))
+#queryList.append(Query([2], "https://www.bestbuy.com/site/nvidia-geforce-rtx-nvlink-bridge-for-30-series-products-space-gray/6441554.p?skuId=6441554", True))
+
+iteration = 0
+sleepDelay = 8
+timeoutDelay = 5
 
 def queryStock():
-    global stores
-    global queryList
-
     for query in queryList:
-        print("Results for: " + query)
-        for store in stores:
-            print("\nFetching " + store.name + "...")
 
-            url = store.searchURL + query.replace(" ", "+")
+        searchingStores = []
+        searchQuery = ""
+
+        searchingStores.extend(query.storeIds)
+        if query.isURL:
+            if len(query.storeIds) != 1:
+                print("URL query [" + query.query +  "] must have one store associated with it")
+            else:
+                searchQuery = query.query
+        else:
+            searchQuery = query.query.replace(" ", "+")
+            if len(searchingStores) == 0:
+                searchingStores.extend([i for i in range(0, len(stores))])
+
+        for storeId in searchingStores:
+            store = stores[storeId]
+
+            url = searchQuery
+            if not query.isURL:
+                url = store.searchURL + url
 
             session = requests.Session()
-            resp = session.get(url, headers=headers)
-            soup = BeautifulSoup(resp.text, 'html.parser')
+            try:
+                resp = session.get(url, headers=headers, timeout=timeoutDelay)
+                soup = BeautifulSoup(resp.text, 'html.parser')
+            except:
+                soup = BeautifulSoup("", 'html.parser')
 
-            print(store.name + " found:")
-            print(store.getItemName(soup))
-            print("Stock status: " + store.getStock(soup, session))
+            itemName = ""
+            stockStatus = ""
+
+            try:
+                itemName = store.getItemNameDirect(soup)
+            except:
+                itemName = "Error"
+
+            try:
+                stockStatus = store.getStockDirect(soup, session)
+            except:
+                stockStatus = "Error"
+
+            stockStatusColor = ""
+            if stockStatus != "Error" and stockStatus != "Out of stock":
+                stockStatusColor = Fore.LIGHTGREEN_EX
+                toaster.show_toast("DropBot", itemName + " found at " + store.name)
+            elif stockStatus == "Error":
+                stockStatusColor = Fore.YELLOW
+            else:
+                stockStatusColor = Fore.RED
+
+            infoString = "[" + time.strftime("%r", time.localtime()) + "] " + Fore.LIGHTCYAN_EX + "[" +  store.name + "] " + Fore.RESET + itemName + " :: " + stockStatusColor + stockStatus + Fore.RESET
+            print(infoString)
+
             session.close()
-        print("\n\n\n")
 
-
-queryStock()
+while True:
+    queryStock()
+    time.sleep(sleepDelay)
+    iteration += 1
