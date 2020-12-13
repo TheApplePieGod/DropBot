@@ -222,12 +222,18 @@ def queryStock():
             stockStatus = ""
 
             try:
-                itemName = store.getItemNameDirect(soup)
+                if query.isURL:
+                    itemName = store.getItemNameDirect(soup)
+                else:
+                    itemName = store.getItemName(soup)
             except:
                 itemName = "Error"
 
             try:
-                stockStatus = store.getStockDirect(soup, session)
+                if query.isURL:
+                    stockStatus = store.getStockDirect(soup, session)
+                else:
+                    stockStatus = store.getStock(soup, session)
             except:
                 stockStatus = "Error"
 
