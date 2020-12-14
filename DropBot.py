@@ -7,6 +7,7 @@ import time
 from colorama import init, Back, Fore, Style
 from asyncio import run, sleep
 from playsound import playsound
+import platform
 
 import DiscordIntegration
 import Logging
@@ -24,7 +25,13 @@ headers = {
     "X-CLIENT-ID": "FRV"
 }
 
-toaster = ToastNotifier()
+toaster = None
+if platform.system() == "Windows":
+    toaster = ToastNotifier()
+
+settingsFile = open("data/Settings.txt", "r")
+settings = json.loads(settingsFile.read())
+settingsFile.close()
 
 class Query:
     def __init__(self, storeIds, query, isURL):
@@ -185,8 +192,8 @@ stores.append(Newegg(len(stores), "Newegg", "https://www.newegg.com/p/pl?d="))
 stores.append(Bestbuy(len(stores), "Bestbuy", "https://www.bestbuy.com/site/searchpage.jsp?sc=Global&usc=All+Categories&st="))
 
 queryList = []
-queryList.append(Query([], "NVIDIA GeForce RTX 3070 8GB GDDR6 PCI Express 4.0 Graphics Card", False))
-#queryList.append(Query([2], "https://www.bestbuy.com/site/nvidia-geforce-rtx-nvlink-bridge-for-30-series-products-space-gray/6441554.p?skuId=6441554", True))
+#queryList.append(Query([], "NVIDIA GeForce RTX 3070 8GB GDDR6 PCI Express 4.0 Graphics Card", False))
+queryList.append(Query([2], "https://www.bestbuy.com/site/nvidia-geforce-rtx-nvlink-bridge-for-30-series-products-space-gray/6441554.p?skuId=6441554", True))
 
 iteration = 0
 sleepDelay = 8
@@ -246,9 +253,12 @@ async def queryStock():
             if stockStatus != "Error" and stockStatus != "Out of stock":
                 stockStatusColor = Fore.LIGHTGREEN_EX
                 foundMessage = itemName + " found at " + store.name
-                toaster.show_toast("DropBot", foundMessage, threaded=True)
-                await DiscordIntegration.discord_notify(foundMessage)
-                playsound("data/NotifySound.wav")
+                if platform.system() == "Windows":
+                    toaster.show_toast("DropBot", foundMessage, threaded=True)
+                if settings["notifyOnDiscord"]:
+                    await DiscordIntegration.discord_notify(foundMessage)
+                if settings["playSounds"]:
+                    playsound("data/NotifySound.wav")
             elif stockStatus == "Error":
                 stockStatusColor = Fore.YELLOW
             else:
