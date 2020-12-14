@@ -2,12 +2,13 @@ from bs4 import BeautifulSoup
 from urllib import request
 import json
 import requests
-from win10toast import ToastNotifier
+import platform
+if platform.system() == "Windows":
+    from win10toast import ToastNotifier
 import time
 from colorama import init, Back, Fore, Style
 from asyncio import run, sleep
 from playsound import playsound
-import platform
 
 import DiscordIntegration
 import Logging
@@ -192,8 +193,8 @@ stores.append(Newegg(len(stores), "Newegg", "https://www.newegg.com/p/pl?d="))
 stores.append(Bestbuy(len(stores), "Bestbuy", "https://www.bestbuy.com/site/searchpage.jsp?sc=Global&usc=All+Categories&st="))
 
 queryList = []
-#queryList.append(Query([], "NVIDIA GeForce RTX 3070 8GB GDDR6 PCI Express 4.0 Graphics Card", False))
-queryList.append(Query([2], "https://www.bestbuy.com/site/nvidia-geforce-rtx-nvlink-bridge-for-30-series-products-space-gray/6441554.p?skuId=6441554", True))
+queryList.append(Query([], "NVIDIA GeForce RTX 3070 8GB GDDR6 PCI Express 4.0 Graphics Card", False))
+#queryList.append(Query([2], "https://www.bestbuy.com/site/nvidia-geforce-rtx-nvlink-bridge-for-30-series-products-space-gray/6441554.p?skuId=6441554", True))
 
 iteration = 0
 sleepDelay = 8
