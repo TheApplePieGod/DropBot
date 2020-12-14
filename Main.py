@@ -5,6 +5,10 @@ import requests
 from win10toast import ToastNotifier
 import time
 from colorama import init, Back, Fore, Style
+from asyncio import run, sleep
+
+import DiscordIntegration
+import Logging
 
 init(convert=True)
 
@@ -187,7 +191,7 @@ iteration = 0
 sleepDelay = 8
 timeoutDelay = 5
 
-def queryStock():
+async def queryStock():
     for query in queryList:
 
         searchingStores = []
@@ -240,18 +244,26 @@ def queryStock():
             stockStatusColor = ""
             if stockStatus != "Error" and stockStatus != "Out of stock":
                 stockStatusColor = Fore.LIGHTGREEN_EX
-                toaster.show_toast("DropBot", itemName + " found at " + store.name)
+                foundMessage = itemName + " found at " + store.name
+                toaster.show_toast("DropBot", foundMessage, threaded=True)
+                await DiscordIntegration.discord_notify(foundMessage)
             elif stockStatus == "Error":
                 stockStatusColor = Fore.YELLOW
             else:
                 stockStatusColor = Fore.RED
 
-            infoString = "[" + time.strftime("%r", time.localtime()) + "] " + Fore.LIGHTCYAN_EX + "[" +  store.name + "] " + Fore.RESET + itemName + " :: " + stockStatusColor + stockStatus + Fore.RESET
-            print(infoString)
+            infoString = Fore.LIGHTCYAN_EX + "[" +  store.name + "] " + Fore.RESET + itemName + " :: " + stockStatusColor + stockStatus + Fore.RESET
+            Logging.logWithTimestamp(infoString)
 
             session.close()
 
-while True:
-    queryStock()
-    time.sleep(sleepDelay)
-    iteration += 1
+async def main():
+    global iteration
+    await DiscordIntegration.client.wait_until_ready()
+    await DiscordIntegration.init_users()
+    while not DiscordIntegration.client.is_closed():
+        await queryStock()
+        iteration += 1
+        await sleep(sleepDelay)
+
+DiscordIntegration.init_discord(main)

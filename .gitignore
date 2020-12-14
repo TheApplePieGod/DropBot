@@ -10,6 +10,8 @@ __pycache__/
 *.pyproj.user
 *.sln
 .vs/*
+DiscordToken.txt
+UserInfo.txt
 
 # Distribution / packaging
 .Python
