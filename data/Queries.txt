@@ -1,0 +1,4 @@
+{ "queries":[
+{ "storeNames": [], "queryString": "NVIDIA GeForce RTX 3070 8GB GDDR6 PCI Express 4.0 Graphics Card", "isURL": false, "active": true },
+{ "storeNames": ["Bestbuy"], "queryString": "https://www.bestbuy.com/site/nvidia-geforce-rtx-nvlink-bridge-for-30-series-products-space-gray/6441554.p?skuId=6441554", "isURL": true, "active": false }
+] }

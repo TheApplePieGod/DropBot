@@ -35,10 +35,11 @@ settings = json.loads(settingsFile.read())
 settingsFile.close()
 
 class Query:
-    def __init__(self, storeIds, query, isURL):
+    def __init__(self, storeIds, query, isURL, active):
         self.storeIds = storeIds
         self.query = query
         self.isURL = isURL
+        self.active = active
 
 class Store:
     def __init__(self, id, name, searchURL):
@@ -193,82 +194,91 @@ stores.append(Newegg(len(stores), "Newegg", "https://www.newegg.com/p/pl?d="))
 stores.append(Bestbuy(len(stores), "Bestbuy", "https://www.bestbuy.com/site/searchpage.jsp?sc=Global&usc=All+Categories&st="))
 
 queryList = []
-queryList.append(Query([], "NVIDIA GeForce RTX 3070 8GB GDDR6 PCI Express 4.0 Graphics Card", False))
-#queryList.append(Query([2], "https://www.bestbuy.com/site/nvidia-geforce-rtx-nvlink-bridge-for-30-series-products-space-gray/6441554.p?skuId=6441554", True))
+#queryList.append(Query([], "NVIDIA GeForce RTX 3070 8GB GDDR6 PCI Express 4.0 Graphics Card", False, True))
+#queryList.append(Query([2], "https://www.bestbuy.com/site/nvidia-geforce-rtx-nvlink-bridge-for-30-series-products-space-gray/6441554.p?skuId=6441554", True, True))
+
+queryFile = open("data/Queries.txt", "r")
+queryObj = json.loads(queryFile.read())["queries"]
+for elem in queryObj:
+    newQuery = Query([], elem["queryString"], elem["isURL"], elem["active"])
+    for storeName in elem["storeNames"]:
+        for i in range(0, len(stores)):
+            if stores[i].name.lower() == storeName.lower():
+                newQuery.storeIds.append(i)
+    queryList.append(newQuery)
+queryFile.close()
 
 iteration = 0
-sleepDelay = 8
-timeoutDelay = 5
 
 async def queryStock():
     for query in queryList:
+        if query.active:
+            searchingStores = []
+            searchQuery = ""
 
-        searchingStores = []
-        searchQuery = ""
-
-        searchingStores.extend(query.storeIds)
-        if query.isURL:
-            if len(query.storeIds) != 1:
-                print("URL query [" + query.query +  "] must have one store associated with it")
-            else:
-                searchQuery = query.query
-        else:
-            searchQuery = query.query.replace(" ", "+")
-            if len(searchingStores) == 0:
-                searchingStores.extend([i for i in range(0, len(stores))])
-
-        for storeId in searchingStores:
-            store = stores[storeId]
-
-            url = searchQuery
-            if not query.isURL:
-                url = store.searchURL + url
-
-            session = requests.Session()
-            try:
-                resp = session.get(url, headers=headers, timeout=timeoutDelay)
-                soup = BeautifulSoup(resp.text, 'html.parser')
-            except:
-                soup = BeautifulSoup("", 'html.parser')
-
-            itemName = ""
-            stockStatus = ""
-
-            try:
-                if query.isURL:
-                    itemName = store.getItemNameDirect(soup)
+            searchingStores.extend(query.storeIds)
+            if query.isURL:
+                if len(query.storeIds) != 1:
+                    print("URL query [" + query.query +  "] must have one store associated with it")
                 else:
-                    itemName = store.getItemName(soup)
-            except:
-                itemName = "Error"
-
-            try:
-                if query.isURL:
-                    stockStatus = store.getStockDirect(soup, session)
-                else:
-                    stockStatus = store.getStock(soup, session)
-            except:
-                stockStatus = "Error"
-
-            stockStatusColor = ""
-            if stockStatus != "Error" and stockStatus != "Out of stock":
-                stockStatusColor = Fore.LIGHTGREEN_EX
-                foundMessage = itemName + " found at " + store.name
-                if platform.system() == "Windows":
-                    toaster.show_toast("DropBot", foundMessage, threaded=True)
-                if settings["notifyOnDiscord"]:
-                    await DiscordIntegration.discord_notify(foundMessage)
-                if settings["playSounds"]:
-                    playsound("data/NotifySound.wav")
-            elif stockStatus == "Error":
-                stockStatusColor = Fore.YELLOW
+                    searchQuery = query.query
             else:
-                stockStatusColor = Fore.RED
+                searchQuery = query.query.replace(" ", "+")
+                if len(searchingStores) == 0:
+                    searchingStores.extend([i for i in range(0, len(stores))])
 
-            infoString = Fore.LIGHTCYAN_EX + "[" +  store.name + "] " + Fore.RESET + itemName + " :: " + stockStatusColor + stockStatus + Fore.RESET
-            Logging.logWithTimestamp(infoString)
+            for storeId in searchingStores:
+                store = stores[storeId]
 
-            session.close()
+                url = searchQuery
+                if not query.isURL:
+                    url = store.searchURL + url
+
+                session = requests.Session()
+                try:
+                    resp = session.get(url, headers=headers, timeout=settings["maxTimeout"])
+                    soup = BeautifulSoup(resp.text, 'html.parser')
+                except:
+                    soup = BeautifulSoup("", 'html.parser')
+
+                itemName = ""
+                stockStatus = ""
+
+                try:
+                    if query.isURL:
+                        itemName = store.getItemNameDirect(soup)
+                    else:
+                        itemName = store.getItemName(soup)
+                except:
+                    itemName = "Error"
+
+                try:
+                    if query.isURL:
+                        stockStatus = store.getStockDirect(soup, session)
+                    else:
+                        stockStatus = store.getStock(soup, session)
+                except:
+                    stockStatus = "Error"
+
+                stockStatusColor = ""
+                if stockStatus != "Error" and stockStatus != "Out of stock":
+                    stockStatusColor = Fore.LIGHTGREEN_EX
+                    foundMessage = itemName + " found at " + store.name
+                    if platform.system() == "Windows":
+                        toaster.show_toast("DropBot", foundMessage, threaded=True)
+                    if settings["notifyOnDiscord"]:
+                        await DiscordIntegration.discord_notify(foundMessage)
+                    if settings["playSounds"]:
+                        playsound("data/NotifySound.wav")
+                elif stockStatus == "Error":
+                    stockStatusColor = Fore.YELLOW
+                else:
+                    stockStatusColor = Fore.RED
+
+                infoString = Fore.LIGHTCYAN_EX + "[" +  store.name + "] " + Fore.RESET + itemName + " :: " + stockStatusColor + stockStatus + Fore.RESET
+                Logging.logWithTimestamp(infoString)
+
+                session.close()
 
 async def main():
     global iteration
@@ -277,6 +287,6 @@ async def main():
     while not DiscordIntegration.client.is_closed():
         await queryStock()
         iteration += 1
-        await sleep(sleepDelay)
+        await sleep(settings["sleepDelay"])
 
 DiscordIntegration.init_discord(main)
