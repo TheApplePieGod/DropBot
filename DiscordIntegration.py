@@ -1,6 +1,5 @@
 import discord
 import asyncio
-import json
 from colorama import Fore
 
 import Logging
@@ -10,7 +9,7 @@ members = []
 
 async def init_users():
     global members
-    membersFile = open("UserInfo.txt", "r")
+    membersFile = open("data/UserInfo.txt", "r")
     info = membersFile.read()
     membersFile.close()
     memberIds = info.split(',')
@@ -37,7 +36,7 @@ async def discord_notify(message):
     if failed > 0:
         Logging.logWithTimestamp("Discord notify failed " + str(failed) + '/' + str(len(members)) + " times", Fore.RED)
 
-tokenFile = open("DiscordToken.txt", "r")
+tokenFile = open("data/DiscordToken.txt", "r")
 discordBotToken = tokenFile.read()
 tokenFile.close()
 

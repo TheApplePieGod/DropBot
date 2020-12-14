@@ -248,7 +248,7 @@ async def queryStock():
                 foundMessage = itemName + " found at " + store.name
                 toaster.show_toast("DropBot", foundMessage, threaded=True)
                 await DiscordIntegration.discord_notify(foundMessage)
-                playsound("NotifySound.wav")
+                playsound("data/NotifySound.wav")
             elif stockStatus == "Error":
                 stockStatusColor = Fore.YELLOW
             else:
