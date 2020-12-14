@@ -6,6 +6,7 @@ from win10toast import ToastNotifier
 import time
 from colorama import init, Back, Fore, Style
 from asyncio import run, sleep
+from playsound import playsound
 
 import DiscordIntegration
 import Logging
@@ -247,6 +248,7 @@ async def queryStock():
                 foundMessage = itemName + " found at " + store.name
                 toaster.show_toast("DropBot", foundMessage, threaded=True)
                 await DiscordIntegration.discord_notify(foundMessage)
+                playsound("NotifySound.wav")
             elif stockStatus == "Error":
                 stockStatusColor = Fore.YELLOW
             else:
