@@ -3,15 +3,20 @@ from urllib import request
 import json
 import requests
 import platform
-if platform.system() == "Windows":
-    from win10toast import ToastNotifier
 import time
 from colorama import init, Back, Fore, Style
 from asyncio import run, sleep
 from playsound import playsound
-
-import DiscordIntegration
 import Logging
+
+settingsFile = open("data/Settings.txt", "r")
+settings = json.loads(settingsFile.read())
+settingsFile.close()
+
+if platform.system() == "Windows":
+    from win10toast import ToastNotifier
+if settings["notifyOnDiscord"]:
+    import DiscordIntegration
 
 init(convert=True)
 
@@ -29,10 +34,6 @@ headers = {
 toaster = None
 if platform.system() == "Windows":
     toaster = ToastNotifier()
-
-settingsFile = open("data/Settings.txt", "r")
-settings = json.loads(settingsFile.read())
-settingsFile.close()
 
 class Query:
     def __init__(self, storeIds, query, isURL, active):
@@ -282,11 +283,20 @@ async def queryStock():
 
 async def main():
     global iteration
-    await DiscordIntegration.client.wait_until_ready()
-    await DiscordIntegration.init_users()
-    while not DiscordIntegration.client.is_closed():
-        await queryStock()
-        iteration += 1
-        await sleep(settings["sleepDelay"])
+    if settings["notifyOnDiscord"]:
+        await DiscordIntegration.client.wait_until_ready()
+        await DiscordIntegration.init_users()
+        while not DiscordIntegration.client.is_closed():
+            await queryStock()
+            iteration += 1
+            await sleep(settings["sleepDelay"])
+    else:
+        while True:
+            await queryStock()
+            iteration += 1
+            await sleep(settings["sleepDelay"])
 
-DiscordIntegration.init_discord(main)
+if settings["notifyOnDiscord"]:
+    DiscordIntegration.init_discord(main)
+else:
+    run(main())
