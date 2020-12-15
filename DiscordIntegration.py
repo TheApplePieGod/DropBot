@@ -16,7 +16,7 @@ async def init_users():
     for id in memberIds:
         newMember = await client.fetch_user(int(id))
         members.append(newMember)
-    Logging.logWithTimestamp("Discord ready")
+    Logging.logInfo("Discord ready")
 
 async def discord_notify(message):
     success = 0
@@ -32,9 +32,9 @@ async def discord_notify(message):
         else:
             failed += 1
     if success > 0:
-        Logging.logWithTimestamp("Discord notified succeeded " + str(success) + '/' + str(len(members)) + " times", Fore.YELLOW)
+        Logging.logInfo("Discord notified succeeded " + str(success) + '/' + str(len(members)) + " times", Fore.YELLOW)
     if failed > 0:
-        Logging.logWithTimestamp("Discord notify failed " + str(failed) + '/' + str(len(members)) + " times", Fore.RED)
+        Logging.logInfo("Discord notify failed " + str(failed) + '/' + str(len(members)) + " times", Fore.RED)
 
 tokenFile = open("data/DiscordToken.txt", "r")
 discordBotToken = tokenFile.read()

@@ -2,8 +2,8 @@ import time
 from colorama import Fore
 
 def logWithTimestamp(message, color=""):
-    formattedMessage = "[" + time.strftime("%r", time.localtime()) + "] " + message
-    if color == "":
-        print(formattedMessage)
-    else:
-        print(color + formattedMessage + Fore.RESET)
+    formattedMessage = "[" + time.strftime("%r", time.localtime()) + "] " + color + message + Fore.RESET
+    print(formattedMessage)
+
+def logInfo(message, color = ""):
+    logWithTimestamp(Fore.MAGENTA + "[Info] " + Fore.RESET + color + message + Fore.RESET)

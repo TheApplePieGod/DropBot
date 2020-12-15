@@ -391,7 +391,7 @@ async def queryStock():
 
 async def main():
     global iteration
-    Logging.logWithTimestamp("Notice: Commands will not register until after a cycle has been completed", Fore.YELLOW)
+    Logging.logInfo("Commands will not register until after a cycle has been completed", Fore.YELLOW)
     if settings["notifyOnDiscord"]:
         await DiscordIntegration.client.wait_until_ready()
         await DiscordIntegration.init_users()
