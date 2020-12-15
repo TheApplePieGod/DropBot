@@ -23,6 +23,9 @@ def handle_input():
         elif command == "resume":
             Globals.running = True
             success = True
+        elif command == "switch":
+            Globals.switchUserAgent()
+            success = True
 
         if success:
             logWithTimestamp("Command [" + command + "] successful", Fore.LIGHTGREEN_EX)

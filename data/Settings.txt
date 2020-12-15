@@ -1,1 +1,1 @@
-{ "playSounds": true, "notifyOnDiscord": true, "sleepDelay": 6, "maxTimeout": 5, "userAgentSwitchCycles": 75 }
+{ "playSounds": true, "notifyOnDiscord": true, "sleepDelay": 7, "maxTimeout": 5, "userAgentSwitchCycles": 50 }

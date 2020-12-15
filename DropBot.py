@@ -11,7 +11,6 @@ import Logging
 import Globals
 from Input import async_input, handle_input
 from threading import Thread
-import random
 
 settingsFile = open("data/Settings.txt", "r")
 settings = json.loads(settingsFile.read())
@@ -23,35 +22,6 @@ if settings["notifyOnDiscord"]:
     import DiscordIntegration
 
 init(convert=True)
-
-userAgentList = [
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.0.98 Safari/537.36",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.1.98 Safari/537.36",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.2.98 Safari/537.36",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.3.98 Safari/537.36",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4.98 Safari/537.36",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.5.98 Safari/537.36",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.6.98 Safari/537.36",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.7.98 Safari/537.36",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.8.98 Safari/537.36",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.9.98 Safari/537.36",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.10.98 Safari/537.36",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.11.98 Safari/537.36",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.12.98 Safari/537.36",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.13.98 Safari/537.36",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.14.98 Safari/537.36"
-]
-
-headers = {
-    "Accept": "*/*",
-    "Accept-Language": "en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7",
-    "Content-Type": "application/json",
-    "Cache-Control": "max-age=0",
-    "Upgrade-Insecure-Requests": "1",
-    "User-Agent": userAgentList[random.randint(0, len(userAgentList) - 1)],
-    "Connection": "keep-alive",
-    "X-CLIENT-ID": "FRV"
-}
 
 toaster = None
 if platform.system() == "Windows":
@@ -150,7 +120,7 @@ class Newegg(Store):
             itemElem = soup.select_one('div[class=item-container] > div > a')
             if itemElem != None:
                 url = itemElem["href"].replace(" ", "+")
-                resp = session.get(url, headers=headers, timeout=settings["maxTimeout"])
+                resp = session.get(url, headers=Globals.headers, timeout=settings["maxTimeout"])
                 productSoup = BeautifulSoup(resp.text, 'html.parser')
 
                 return self.getStockDirect(productSoup, session)
@@ -177,7 +147,7 @@ class Bestbuy(Store):
         url = "https://www.bestbuy.com/fulfillment/ispu/api/ispu/v2"
         data = { "channel":"Ecommerce", "checkRetailAvailability":True, "lookupInStoreQuantity":True, "requestInfos": [{ "additionalLocationIds": [], "condition": None, "itemSeqNumber": "1", "locationId": "0", "sku": skuVal }], "searchNearby":False }
             
-        resp = session.post(url, json=data, headers=headers)
+        resp = session.post(url, json=data, headers=Globals.headers)
         obj = json.loads(resp.text)
 
         return "In stock" if obj["responseInfos"][0]["pickupEligible"] else "Out of stock"
@@ -298,7 +268,7 @@ class Amazon(Store):
             return "Error"
         else:
             url = "https://amazon.com" + textElem.parent["href"].replace(" ", "+")
-            resp = session.get(url, headers=headers, timeout=settings["maxTimeout"])
+            resp = session.get(url, headers=Globals.headers, timeout=settings["maxTimeout"])
             productSoup = BeautifulSoup(resp.text, 'html.parser')
             return self.getStockDirect(productSoup, session)
 
@@ -347,8 +317,7 @@ iteration = 0
 async def queryStock():
     if Globals.running:
         if iteration % settings["userAgentSwitchCycles"] == 0:
-            headers["User-Agent"] = userAgentList[random.randint(0, len(userAgentList) - 1)]
-            Logging.logWithTimestamp("User agent switched")
+            Globals.switchUserAgent()
 
         for query in queryList:
             if query.active:
@@ -376,7 +345,7 @@ async def queryStock():
                     session = requests.Session()
                     soup = None
                     try:
-                        resp = session.get(url, headers=headers, timeout=settings["maxTimeout"])
+                        resp = session.get(url, headers=Globals.headers, timeout=settings["maxTimeout"])
                         soup = BeautifulSoup(resp.text, 'html.parser')
                     except:
                         soup = BeautifulSoup("", 'html.parser')
