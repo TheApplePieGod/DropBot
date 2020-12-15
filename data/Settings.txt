@@ -1,1 +1,1 @@
-{ "playSounds": true, "notifyOnDiscord": true, "sleepDelay": 8, "maxTimeout": 5 }
+{ "playSounds": true, "notifyOnDiscord": true, "sleepDelay": 6, "maxTimeout": 5 }

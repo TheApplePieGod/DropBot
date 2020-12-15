@@ -39,8 +39,9 @@ if platform.system() == "Windows":
     toaster = ToastNotifier()
 
 class Query:
-    def __init__(self, storeIds, query, isURL, active):
+    def __init__(self, storeIds, excludeIds, query, isURL, active):
         self.storeIds = storeIds
+        self.excludeIds = excludeIds
         self.query = query
         self.isURL = isURL
         self.active = active
@@ -118,7 +119,8 @@ class Newegg(Store):
     def getStock(self, soup, session):
         # check for 'out of stock' promo
         outOfStock = False
-        promoElem = soup.select_one('div[class=item-container] > div > p')
+        parentContainer = soup.select_one("div[class=item-container]")
+        promoElem = parentContainer.select_one('div > p[class=item-promo]')
         if promoElem != None:
             promoText = promoElem.text.strip().replace("\"", "").lower()
             outOfStock = promoText == "out of stock"
@@ -129,9 +131,8 @@ class Newegg(Store):
             itemElem = soup.select_one('div[class=item-container] > div > a')
             if itemElem != None:
                 url = itemElem["href"].replace(" ", "+")
-                resp = request.urlopen(url)
-                webContent = resp.read()
-                productSoup = BeautifulSoup(webContent, 'html.parser')
+                resp = session.get(url, headers=headers, timeout=settings["maxTimeout"])
+                productSoup = BeautifulSoup(resp.text, 'html.parser')
 
                 return self.getStockDirect(productSoup, session)
             else:
@@ -242,24 +243,83 @@ class BHPhotoVideo(Store):
             else:
                 return "In stock"
 
+class Amazon(Store):
+    def getSearchedItemRoot(self, soup):
+        foundElements = soup.select("span[class='celwidget slot=MAIN template=SEARCH_RESULTS widgetId=search-results']")
+        actualElement = None
+        for i in range(0, len(foundElements)):
+            if foundElements[i].select_one("div[data-component-type='sp-sponsored-result']") == None:
+                return foundElements[i]
+
+    def getNameElement(self, soup):
+        productRoot = self.getSearchedItemRoot(soup)
+        if productRoot == None:
+            return None
+        else:
+            return productRoot.select_one("span[class~='a-text-normal']")
+
+    def getItemName(self, soup):
+        textElem = self.getNameElement(soup)
+        if textElem == None:
+            return "Error"
+        else:
+            return textElem.text.strip()
+
+    def getItemNameDirect(self, soup):
+        productElem = soup.select_one("span[id=productTitle]")
+        if productElem == None:
+            return "Error"
+        else:
+            return productElem.text.strip()
+
+    def getStock(self, soup, session):
+        # we need to go to the product page itself and get the info there
+        textElem = self.getNameElement(soup)
+        if textElem == None:
+            return "Error"
+        else:
+            url = "https://amazon.com" + textElem.parent["href"].replace(" ", "+")
+            resp = session.get(url, headers=headers, timeout=settings["maxTimeout"])
+            productSoup = BeautifulSoup(resp.text, 'html.parser')
+            return self.getStockDirect(productSoup, session)
+
+    def getStockDirect(self, soup, session):
+        rightColumn = soup.select_one("div[id=rightCol]")
+        if rightColumn == None:
+            return "Error"
+        else:
+            buttonElem = rightColumn.select_one("input[id=add-to-cart-button]")
+            if buttonElem == None:
+                availabilityElem = soup.select_one("div[id=availability]")
+                if availabilityElem == None or "available " not in availabilityElem.text.lower():
+                    return "Out of stock"
+                else:
+                    return "In stock"
+            else:
+                return "In stock"
+
 stores = []
 stores.append(Microcenter(len(stores), "Microcenter", "https://www.microcenter.com/search/search_results.aspx?Ntt="))
 stores.append(Newegg(len(stores), "Newegg", "https://www.newegg.com/p/pl?d="))
 stores.append(Bestbuy(len(stores), "Bestbuy", "https://www.bestbuy.com/site/searchpage.jsp?sc=Global&usc=All+Categories&st="))
 stores.append(BHPhotoVideo(len(stores), "B&H", "https://www.bhphotovideo.com/c/search?Ntt="))
+stores.append(Amazon(len(stores), "Amazon", "https://www.amazon.com/s?k="))
 
 queryList = []
-#queryList.append(Query([3], "NVIDIA GeForce RTX 3070 8GB GDDR6 PCI Express 4.0 Graphics Card", False, True))
-#queryList.append(Query([2], "https://www.bestbuy.com/site/nvidia-geforce-rtx-nvlink-bridge-for-30-series-products-space-gray/6441554.p?skuId=6441554", True, True))
+#queryList.append(Query([4], [], "https://www.amazon.com/PNY-GeForce-Gaming-Uprising-Graphics/dp/B08HBF5L3K?ref_=ast_sto_dp", True, True))
+#queryList.append(Query([2], [], "https://www.bestbuy.com/site/nvidia-geforce-rtx-nvlink-bridge-for-30-series-products-space-gray/6441554.p?skuId=6441554", True, True))
 
 queryFile = open("data/Queries.txt", "r")
 queryObj = json.loads(queryFile.read())["queries"]
 for elem in queryObj:
-    newQuery = Query([], elem["queryString"], elem["isURL"], elem["active"])
+    newQuery = Query([], [], elem["queryString"], elem["isURL"], elem["active"])
     for storeName in elem["storeNames"]:
         for i in range(0, len(stores)):
-            if stores[i].name.lower() == storeName.lower():
-                newQuery.storeIds.append(i)
+            if stores[i].name.lower() in storeName.lower():
+                if len(storeName) > 0 and storeName[0] == '!':
+                    newQuery.excludeIds.append(i)
+                else:
+                    newQuery.storeIds.append(i)
     queryList.append(newQuery)
 queryFile.close()
 
@@ -281,7 +341,7 @@ async def queryStock():
                 else:
                     searchQuery = query.query.replace(" ", "+")
                     if len(searchingStores) == 0:
-                        searchingStores.extend([i for i in range(0, len(stores))])
+                        searchingStores.extend([i for i in range(0, len(stores)) if i not in query.excludeIds])
 
                 for storeId in searchingStores:
                     store = stores[storeId]
@@ -291,6 +351,7 @@ async def queryStock():
                         url = store.searchURL + url
 
                     session = requests.Session()
+                    soup = None
                     try:
                         resp = session.get(url, headers=headers, timeout=settings["maxTimeout"])
                         soup = BeautifulSoup(resp.text, 'html.parser')
