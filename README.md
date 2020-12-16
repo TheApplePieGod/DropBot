@@ -11,7 +11,7 @@ Current supported websites include: [Microcenter](https://www.microcenter.com/),
 - Optional setting to play a very loud audio cue when a product is found in stock
 - Optional discord bot integration which will message specified users when new stock is found
 - Detailed real-time logging
-    - ![Logging](https://github.com/TheApplePieGod/DropBot/blob/master/images/Logging.png?raw=true)
+    - ![Logging](https://raw.githubusercontent.com/TheApplePieGod/DropBot/main/images/Logging.png)
 - Various browser spoofing techniques to circumvent bot detection
 - Inline commands such as 'pause', 'stop', etc.
 - Tested on Windows 10 and Linux
