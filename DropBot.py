@@ -210,7 +210,7 @@ class BHPhotoVideo(Store):
         #       return "Out of stock"
 
         ### method 2: look for "add to cart" button
-        parentElem = soup.select_one('div[data-selenium=miniProductPageQuantityContainer]')
+        parentElem = soup.select_one('div[data-selenium=miniProductPage]')
         if parentElem == None:
            return "Error"
         else:
